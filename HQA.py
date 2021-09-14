@@ -71,7 +71,7 @@ def reset_enc_train_ry_q_net(n_qubits):
     @qml.qnode(dev, interface="torch")
     def enc_train_ry_q_net(q_weights_flat, amplitudes=None, init_rot=None, q_depth=None, n_qubits=None):
         """ Used for training that performs the swap test. The name says encoder but super confusing!!
-            Everything however seems to work, just dont touch the code. Lol. """
+            Everything however seems to work, just dont touch the code. """
         qml.QubitStateVector(amplitudes, wires=list(range(n_qubits + 1, n_qubits*2+1)))
         # Reshape weights
         q_weights = q_weights_flat.reshape(q_depth, n_qubits)
@@ -301,16 +301,16 @@ class HQA(nn.Module):
     def save(self, loss_evol):
 
         i = 0
-        filename = 'pickled_models/hqa_model_ver_{}'.format(i)
+        filename = 'pickled_models/hqa_model_ver_{}.pickle'.format(i)
         while os.path.isfile(filename):
             i += 1
-            filename = 'pickled_models/hqa_model_ver_{}'.format(i)
+            filename = 'pickled_models/hqa_model_ver_{}.pickle'.format(i)
 
         dbfile = open(filename, 'wb')
         pickle.dump(self, dbfile)
         dbfile.close()
 
-        filename = 'pickled_models/hqa_loss_evol_ver_{}'.format(i)
+        filename = 'pickled_models/hqa_loss_evol_ver_{}.pickle'.format(i)
         dbfile = open(filename, 'wb')
         pickle.dump(loss_evol, dbfile)
         dbfile.close()

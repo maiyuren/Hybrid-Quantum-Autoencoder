@@ -9,11 +9,11 @@ import numpy as np
 
 def heisenberg_hqa_script(n_qubits, distributions):
     
-    latent_size = 12
-    num_params_dec = 4 * latent_size
+    latent_size = n_qubits + 2 
+    num_params_dec = 5 * latent_size
     num_params_enc = n_qubits * 5
     N = 2 ** n_qubits
-    num_iterations = 40
+    num_iterations = 500
     batch_size = 2
     interwoven = False
     adv_decoder = True
@@ -68,4 +68,4 @@ def run_heisenberg_hqa_from_datafile(filename):
 
 if __name__ == '__main__':
 
-    run_heisenberg_hqa_from_datafile("data.pkl")
+    run_heisenberg_hqa_from_datafile("data_n_qubits-6.pkl")
