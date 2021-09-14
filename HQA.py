@@ -178,9 +178,9 @@ class HQA(nn.Module):
         self.regular_term = None
         self._last_latent_vector = None
 
-    def forward(self, x, save_state=False):
+    def forward(self, x):
 
-        amplitudes = torch.tensor(amplitudes)
+        amplitudes = x
 
         assert len(x) == 2 ** self.n_qubits
 
@@ -216,7 +216,7 @@ class HQA(nn.Module):
 
         return loss
 
-    def encoder(self, z, plot=False):
+    def encoder(self, z, plot=False): # Note the naming is different
         """ Going from latent space to the state vector """
         z = torch.tensor(z)
         out = torch.sigmoid(self.c_layer1(z.float()))
@@ -238,7 +238,7 @@ class HQA(nn.Module):
             plt.show()
         return q_out
 
-    def decoder(self, x):
+    def decoder(self, x): # Note that the naming is different 
         """ Going from state to latent vector """
         # Encoder section
         amplitudes = np.array(x)
@@ -357,11 +357,10 @@ class HQA(nn.Module):
     def latent_landscape(self, p1, p2, p3=None, states=None):
         """ This function plots the states on the landscape of two parameters with index labels p1 & p2.
             states should be a DataFrame. """
-        try:
-            if states == None:
-                states = self.df_latent_vectors
-        except ValueError:
-            pass
+        
+        if states == None:
+            states = self.df_latent_vectors
+
 
         p1_list, p2_list, p3_list = [], [], []
         for s in range(len(states)):
@@ -391,7 +390,7 @@ class HQA(nn.Module):
         self.pca = PCA(n_components=projection_size)
         self.latent_vectors = self.pca.fit_transform(self.raw_latent_vectors)
 
-    def dataframe_latent_points(self, d_type='gaussian'):
+    def dataframe_latent_points(self, d_type=None):
 
         assert isinstance(self.latent_vectors, np.ndarray), "Must create latent regressor."
         if d_type == 'gaussian':
@@ -401,10 +400,19 @@ class HQA(nn.Module):
             latent_points = pd.DataFrame({'mean': self.characterists_list[:, 0], 'peak': self.characterists_list[:, 1],
                                           'latent_vector': list(self.latent_vectors)})
 
+        elif d_type == 'heisenberg':
+            latent_points = pd.DataFrame({'depth': self.characterists_list[:, 0], 'ham_indx': self.characterists_list[:, 1],
+                                          'latent_vector': list(self.latent_vectors)})
+
+        else:
+            d = {"c{}".format(i): self.characterists_list[:i] for i in range(len(self.characterists_list[0]))}
+            d['latent_vector'] = list(self.latent_vectors)
+            latent_points = pd.DataFrame(d)
+
         self.df_latent_vectors = latent_points
 
 
-def train_hqa(model, distributions, num_iterations, loss_evol=None, batch_size=1, p_fuzz=None,
+def train_hqa(model, distributions, num_iterations, loss_evol=None, batch_size=1,
                regular_term=None):
 
     since = time.time()
@@ -415,7 +423,6 @@ def train_hqa(model, distributions, num_iterations, loss_evol=None, batch_size=1
     criterion = vqc.MSELoss
 
     model.distributions = distributions
-    model.train_p_fuzz = p_fuzz
 
     optimizer = optim.Adam(model.parameters(), lr=step)
     if not loss_evol:
@@ -424,27 +431,22 @@ def train_hqa(model, distributions, num_iterations, loss_evol=None, batch_size=1
         print('-----iteration {}--model:{}------'.format(ii, model))
         with torch.set_grad_enabled(True):
             optimizer.zero_grad()
-            try:
-                d, m, s = distributions.get(p_fuzz=p_fuzz)
-            except ValueError:
-                d, [m, s] = distributions.get()
-            print("m={:.3f}, s={}".format(m, s))
+
+            d = distributions[np.random.randint(len(distributions))]
             output = model(d)
             loss = criterion(1 - output, 0.0)
             if regular_term:
                 loss += regular_term * torch.sum(model._last_latent_vector ** 2)
             for i in range(batch_size-1):
-                try:
-                    d, m, s = distributions.get_random(p_fuzz=p_fuzz)
-                except ValueError:
-                    d, [m, s] = distributions.get_random()
-                print("m={:.3f}, s={}".format(m, s))
+        
+                d = distributions[np.random.randint(len(distributions))]
+
                 output = model(d)
                 loss = loss + criterion(1 - output, 0.0)
                 if regular_term:
                     print("Loss before regular term:", loss)
                     loss += regular_term * torch.sum(model._last_latent_vector ** 2)
-            distributions.save_last_loss(loss, (m, s))
+
             print("Loss", loss)
             loss_evol.append(loss)
             loss.backward()
@@ -452,37 +454,18 @@ def train_hqa(model, distributions, num_iterations, loss_evol=None, batch_size=1
 
     model.train_time = time.time() - since
     model.batch_size = batch_size
-    model.distributions.distr_gen = None
     model.regular_term = regular_term
 
     return model, loss_evol
 
 
-def test_hqa(model, num_test, d_type='gaussian', distr=None, p_fuzz=None):
+def test_hqa(model, num_test, distributions):
     tot_loss = 0
     loss_list = []
 
-    if not d_type:
-        try:
-            d_type = model.distr_type
-        except AttributeError:
-            d_type = 'gaussian'
-
-    if d_type=='gaussian':
-        in_size = 2
-    elif d_type == 'poly_pert_gaussian':
-        in_size = 4
-
-    if distr == None:
-        distr = Distributions(in_size=in_size, N=2 ** model.n_qubits, num_distr=num_test,
-                              iterations=num_test, d_type=d_type)
-
     for ii in tqdm.tqdm(range(num_test)):
         # print("----- Test number {} -------".format(ii))
-        if d_type == 'gaussian':
-            d, m, s = distr.get_random(p_fuzz=p_fuzz)
-        elif d_type == 'poly_pert_gaussian':
-            d, [m, s] = distr.get_random(p_fuzz=p_fuzz)
+        d = distributions[np.random.randint(len(distributions))]
         loss_list.append(model.test(d).detach().numpy())
         tot_loss += loss_list[-1]
 
@@ -490,13 +473,13 @@ def test_hqa(model, num_test, d_type='gaussian', distr=None, p_fuzz=None):
     return tot_loss/num_test, loss_list
 
 
-def test_dataframe_hqa(num_test, models, model_filenames, loss_filenames, d_type='gaussian', p_fuzz=None,
+def test_dataframe_hqa(num_test, models, model_filenames, loss_filenames, distributions,
                            save_data=True):
     n_qubit_list, latent_size_list, loss_list, raw_test_results, d_type_list = [], [], [], [], []
     for i, model in enumerate(models):
         print("Testing model: {}".format(model_filenames[i]))
         model.reset_q_circs()
-        loss, results = test_hqa(model, num_test, d_type=d_type, distr=None, p_fuzz=p_fuzz)
+        loss, results = test_hqa(model, num_test, distributions)
         n_qubit_list.append(model.n_qubits)
         latent_size_list.append(model.latent_size)
         loss_list.append(loss)
@@ -526,11 +509,11 @@ def test_dataframe_hqa(num_test, models, model_filenames, loss_filenames, d_type
     return data
 
 
-def hqa_testing_script(required, num_test, d_type='gaussian', p_fuzz=None):
+def hqa_testing_script(required, num_test, distributions):
 
     models, model_filenames, loss_filenames = gd.load_models(required)
-    data = test_dataframe_hqa(num_test, models, model_filenames, loss_filenames, d_type=d_type,
-                               p_fuzz=p_fuzz, save_data=True)
+    data = test_dataframe_hqa(num_test, models, model_filenames, loss_filenames, distributions,
+                               save_data=True)
 
     return data
 
