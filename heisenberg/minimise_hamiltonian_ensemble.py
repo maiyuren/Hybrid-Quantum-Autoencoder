@@ -166,5 +166,5 @@ if __name__ == '__main__':
         data[i] = results[i]
         data[i]['Jlist'] = Jlists[i]
 
-    with open('data_n_qubits-{}.pkl'.format(n_qubits), 'wb') as f:
+    with open('state_files/data_n_qubits-{}.pkl'.format(n_qubits), 'wb') as f:
         pickle.dump(data, f)

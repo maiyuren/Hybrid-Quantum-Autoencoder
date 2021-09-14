@@ -68,4 +68,4 @@ def run_heisenberg_hqa_from_datafile(filename):
 
 if __name__ == '__main__':
 
-    run_heisenberg_hqa_from_datafile("data_n_qubits-6.pkl")
+    run_heisenberg_hqa_from_datafile("state_files/data_n_qubits-6.pkl")
