@@ -4,7 +4,7 @@ from sklearn.decomposition import PCA
 import matplotlib.pyplot as plt
 from required_modules.amplitude_encoding import *
 from required_modules import gaussian_decoding as gd
-
+import tqdm
 
 def standardize_data(X):
     '''
@@ -345,8 +345,8 @@ class HQA(nn.Module):
         assert len(distributions) == len(characteristics)
 
         self.characterists_list, self.latent_vectors = [], []
-        for i, d in enumerate(distributions):
-            print("Creating ... i={}, chara={}".format(i, characteristics[i]))
+        for i, d in tqdm.tqdm(enumerate(distributions)):
+            # print("Creating ... i={}, chara={}".format(i, characteristics[i]))
             self.characterists_list.append(characteristics[i])
             self.latent_vectors.append(self.decoder(d).detach().numpy())
 
@@ -400,12 +400,14 @@ class HQA(nn.Module):
             latent_points = pd.DataFrame({'mean': self.characterists_list[:, 0], 'peak': self.characterists_list[:, 1],
                                           'latent_vector': list(self.latent_vectors)})
 
-        elif d_type == 'heisenberg':
-            latent_points = pd.DataFrame({'depth': self.characterists_list[:, 0], 'ham_indx': self.characterists_list[:, 1],
-                                          'latent_vector': list(self.latent_vectors)})
+        elif d_type == 'heisenberg': # Characteristics need to be supplied in this form with depth as the first column followed by the coupling terms
+            d = {"c{}".format(i): self.characterists_list[:, i] for i in range(1, len(self.characterists_list[0]))}
+            d['depth'] = self.characterists_list[:, 0]
+            d['latent_vector'] = list(self.latent_vectors)
+            latent_points = pd.DataFrame(d)
 
         else:
-            d = {"c{}".format(i): self.characterists_list[:i] for i in range(len(self.characterists_list[0]))}
+            d = {"c{}".format(i): self.characterists_list[:, i] for i in range(len(self.characterists_list[0]))}
             d['latent_vector'] = list(self.latent_vectors)
             latent_points = pd.DataFrame(d)
 

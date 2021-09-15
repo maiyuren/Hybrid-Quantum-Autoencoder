@@ -13,7 +13,7 @@ def heisenberg_hqa_script(n_qubits, distributions):
     num_params_dec = 5 * latent_size
     num_params_enc = n_qubits * 5
     N = 2 ** n_qubits
-    num_iterations = 500
+    num_iterations = 200
     batch_size = 2
     interwoven = False
     adv_decoder = True
