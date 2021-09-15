@@ -1,6 +1,7 @@
 """
 The following code was written by Harish - University of Melbourne
 """
+
 from qiskit import *
 from qiskit.providers.aer import StatevectorSimulator
 import numpy as np
@@ -21,18 +22,21 @@ PDICT = {'X': sparse.csr_matrix(np.array([[0,1],[1,0]])),
 SB = {'I': '00', 'X': '01', 'Y': '10', 'Z': '11'}
 BS = {'00': 'I', '01': 'X', '10': 'Y', '11': 'Z'}
 
+
 def kronN(P):
     Pflip = P[::-1]
     output = PDICT[Pflip[0]]
     for p in Pflip[1:]:
         output = sparse.kron(PDICT[p],output,format='csr')
     return output
-        
+
+
 def H_matrix(H,L):
-    output = sparse.csr_matrix((2**L,2**L),dtype=np.complex_)
+    output = sparse.csr_matrix((2**L,2**L), dtype=np.complex128)
     for P in H:
         output += H[P]*kronN(P)
     return output
+
 
 def to_Pstring(P,L):
     b1,b2 = P
@@ -43,12 +47,14 @@ def to_Pstring(P,L):
         Ps += BS[f'{b1s[i]}{b2s[i]}']
     return Ps
 
+
 def to_binarypair(Ps):
     P0,P1 = '',''
     for p in Ps:
         P0+=SB[p][0]
         P1+=SB[p][1]
     return (int(P0, base=2), int(P1, base=2))
+
 
 # The eSWAP gate
 def eswap(qc,theta,i,j):
@@ -58,6 +64,7 @@ def eswap(qc,theta,i,j):
     qc.rz(-theta/2,i)
     qc.x(i)
     qc.cx(j,i)
+
 
 # The variational state
 def varstate_eswap(qc, L, thetas, d=1):
@@ -80,6 +87,7 @@ def varstate_eswap(qc, L, thetas, d=1):
             eswap(qc,thetas[t]*2*np.pi,j,j+1)
             t += 1
     
+
 # Evaluate the Hamiltonian expectation value given the trial state with parameters theta
 def evalue_statevector(thetas, *args):
     L, D, H = args
@@ -88,6 +96,7 @@ def evalue_statevector(thetas, *args):
     psi = execute(circ,StatevectorSimulator()).result().get_statevector(0)
     return (psi.conjugate().dot(H.dot(psi))).real/(4*L)
 
+
 # Evaluate the fidelity (ground state overlap squared) given the trial state with parameters theta
 def fidelity_statevector(thetas, *args):
     L, D, psi_0 = args
@@ -95,6 +104,7 @@ def fidelity_statevector(thetas, *args):
     varstate_eswap(circ,L,thetas,d=D)
     psi = execute(circ,StatevectorSimulator()).result().get_statevector(0)
     return np.abs(psi.conj() @ psi_0)**2, psi
+
 
 def process_set(s):
     H_expr = Hamiltonians[s]
@@ -105,11 +115,10 @@ def process_set(s):
     psi_0 = evecs[:,evals.argmin()]
     E0 = evals.min()/((4*L))
     
-    
     D = 0
     print(f'Simulating D = 0 ({s})...')
     out = {0:{'D': 0, 'E0': E0, 'E': evalue_statevector([], L, D, H), 'F': fidelity_statevector([], L, D, psi_0), 'x': [], 'nfev': 0, 'nit': 0, 'x0': []}}
-        
+    
     for D in range(1,Dmax+1):
         print(f'Minimising D = {D} ({s})...')
         x0 = np.random.rand(D*L)
@@ -118,11 +127,8 @@ def process_set(s):
         F, statevec = fidelity_statevector(thetas, L, D, psi_0)
         out[D] = {'D': D, 'E0': E0, 'E': res.fun, 'F': F, 'x': thetas, 'nfev': res.nfev, 'nit': res.nit, 'x0': list(x0), 
                  'statevector':statevec}
-    
+        
     return out
-
-
-
 
 
 if __name__ == '__main__':
@@ -130,6 +136,12 @@ if __name__ == '__main__':
     n_qubits = int(sys.argv[1])
     num_Hamiltonians = int(sys.argv[2])
     Dmax = int(sys.argv[3])
+    try:
+        path_flag = True if sys.argv[4] == "True" else False
+        print("Finding points along path={}.".format(path_flag))
+    except:
+        path_flag = False
+
     num_cores = 4
     
     # --------- Creating Hamiltonians --------------------------------------------------------
@@ -137,13 +149,24 @@ if __name__ == '__main__':
     num_Hamiltonians = num_Hamiltonians     # size of random ensemble
     Dmax = Dmax                             # Maximum depth 
 
+    couplings = [(i,i+1) for i in range(L-1)]+[(L-1,0)]
+    path_end_points = [np.random.rand(len(couplings)), 
+                        np.random.rand(len(couplings))] # set to None otherwise
+    
+    # This selects a path for the 
+    if path_flag is not None:
+        vec = (path_end_points[1] - path_end_points[0]) / num_Hamiltonians
+        start = path_end_points[0]
+        weights_list = [start + (vec*i) for i in range(num_Hamiltonians)]
+    else:        
+        weights = [np.random.rand(len(couplings)) for _ in range(num_Hamiltonians)]
+
     np.random.seed(1011780235)
 
     Hamiltonians = []
     Jlists = []
     for k in range(num_Hamiltonians):
-        couplings = [(i,i+1) for i in range(L-1)]+[(L-1,0)]
-        weights = np.random.rand(len(couplings))
+        weights = weights_list[k]
         cwdict = {couplings[i]:weights[i] for i in range(L)}
         H_expr = {}
         for c in cwdict:
@@ -166,5 +189,5 @@ if __name__ == '__main__':
         data[i] = results[i]
         data[i]['Jlist'] = Jlists[i]
 
-    with open('state_files/data_n_qubits-{}.pkl'.format(n_qubits), 'wb') as f:
+    with open('state_files/data{}_n_qubits-{}.pkl'.format("_path" if path_flag else "", n_qubits), 'wb') as f:
         pickle.dump(data, f)
