@@ -9,17 +9,17 @@ import numpy as np
 
 def heisenberg_hqa_script(n_qubits, distributions):
     
-    latent_size = n_qubits + 2 
+    latent_size = n_qubits
     num_params_dec = 5 * latent_size
-    num_params_enc = n_qubits * 5
+    num_params_enc = n_qubits * 6
     N = 2 ** n_qubits
     num_iterations = 200
     batch_size = 2
     interwoven = False
-    adv_decoder = True
+    adv_decoder = False
     regular_term = None 
     
-    model = HQA(n_qubits, latent_size, num_params_enc, num_params_dec, gate_type='ry', interwoven=interwoven,
+    model = HQA(n_qubits, latent_size, num_params_enc, num_params_dec, gate_type='eff_anz', interwoven=interwoven,
                  adv_decoder=adv_decoder)
 
     model, loss_evol = train_hqa(model, distributions, num_iterations, batch_size=batch_size, 

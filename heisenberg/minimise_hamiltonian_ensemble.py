@@ -1,5 +1,7 @@
 """
-The following code was written by Harish - University of Melbourne
+The following code was written by Harish Vallury - University of Melbourne
+    -> In this work we explore the possibility of using the HQA to identify
+        states from the heisenberg model
 """
 
 from qiskit import *
@@ -119,7 +121,7 @@ def process_set(s):
     print(f'Simulating D = 0 ({s})...')
     out = {0:{'D': 0, 'E0': E0, 'E': evalue_statevector([], L, D, H), 'F': fidelity_statevector([], L, D, psi_0), 'x': [], 'nfev': 0, 'nit': 0, 'x0': []}}
     
-    for D in range(1,Dmax+1):
+    for D in D_list:
         print(f'Minimising D = {D} ({s})...')
         x0 = np.random.rand(D*L)
         res = minimise(evalue_statevector, args = (L, D, H), x0 = x0, method = 'BFGS')
@@ -135,7 +137,12 @@ if __name__ == '__main__':
 
     n_qubits = int(sys.argv[1])
     num_Hamiltonians = int(sys.argv[2])
-    Dmax = int(sys.argv[3])
+    if sys.argv[3][0] == "!":
+        D_list = [int(sys.argv[3][1:])]
+    else:
+        Dmax = int(sys.argv[3])
+        D_list = list(range(1, Dmax+1))
+
     try:
         path_flag = True if sys.argv[4] == "True" else False
         print("Finding points along path={}.".format(path_flag))
@@ -147,13 +154,15 @@ if __name__ == '__main__':
     # --------- Creating Hamiltonians --------------------------------------------------------
     L = n_qubits                            # number of qubits
     num_Hamiltonians = num_Hamiltonians     # size of random ensemble
-    Dmax = Dmax                             # Maximum depth 
 
     couplings = [(i,i+1) for i in range(L-1)]+[(L-1,0)]
+
+    # Choosing path end points
     path_end_points = [np.random.rand(len(couplings)), 
                         np.random.rand(len(couplings))] # set to None otherwise
     
-    # This selects a path for the 
+
+    # This generates the path if flagged
     if path_flag is not None:
         vec = (path_end_points[1] - path_end_points[0]) / num_Hamiltonians
         start = path_end_points[0]
@@ -189,5 +198,5 @@ if __name__ == '__main__':
         data[i] = results[i]
         data[i]['Jlist'] = Jlists[i]
 
-    with open('state_files/data{}_n_qubits-{}.pkl'.format("_path" if path_flag else "", n_qubits), 'wb') as f:
+    with open('state_files/data{}_n_qubits-{}.pkl'.format("_path" if path_flag is True else "", n_qubits), 'wb') as f:
         pickle.dump(data, f)
