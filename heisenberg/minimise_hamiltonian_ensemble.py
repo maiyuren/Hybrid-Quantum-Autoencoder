@@ -137,7 +137,7 @@ if __name__ == '__main__':
 
     n_qubits = int(sys.argv[1])
     num_Hamiltonians = int(sys.argv[2])
-    if "!" in sys.argv[3]:
+    if "only" in sys.argv[3]:
         D_list = [int(sys.argv[3][1:])]
     else:
         Dmax = int(sys.argv[3])
