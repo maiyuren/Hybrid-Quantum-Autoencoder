@@ -33,14 +33,14 @@ def standardize_data(X):
     return standardizedArray
 
 
-def reset_dec_ry_q_net(n_qubits):
+def reset_dec_eff_anz_q_net(n_qubits):
 
     dev = qml.device("default.qubit", wires=n_qubits)
 
-    global dec_ry_q_net
+    global dec_eff_anz_q_net
 
     @qml.qnode(dev, interface="torch")
-    def dec_ry_q_net(q_weights_flat, amplitudes=None, amplitude_wires=None, q_depth=None,
+    def dec_eff_anz_q_net(q_weights_flat, amplitudes=None, amplitude_wires=None, q_depth=None,
                      reg_size=None, n_qubits=None):
         """ Going from quantum state to latent space. """
         if not amplitude_wires:
@@ -55,21 +55,24 @@ def reset_dec_ry_q_net(n_qubits):
 
         # Sequence of trainable variational layers
         for k in range(q_depth):
-            vqc.RY_layer(q_weights[k])
+            if k % 2:
+                vqc.RZ_layer(q_weights[k])
+            else:
+                vqc.RY_layer(q_weights[k])
             vqc.entangling_layer(n_qubits)
 
         exp_vals = [qml.expval(qml.PauliZ(i)) for i in range(reg_size)]
         return tuple(exp_vals)
 
 
-def reset_enc_train_ry_q_net(n_qubits):
+def reset_enc_train_eff_anz_q_net(n_qubits):
 
     dev = qml.device("default.qubit", wires=n_qubits)
 
-    global enc_train_ry_q_net
+    global enc_train_eff_anz_q_net
 
     @qml.qnode(dev, interface="torch")
-    def enc_train_ry_q_net(q_weights_flat, amplitudes=None, init_rot=None, q_depth=None, n_qubits=None):
+    def enc_train_eff_anz_q_net(q_weights_flat, amplitudes=None, init_rot=None, q_depth=None, n_qubits=None):
         """ Used for training that performs the swap test. The name says encoder but super confusing!!
             Everything however seems to work, just dont touch the code. """
         qml.QubitStateVector(amplitudes, wires=list(range(n_qubits + 1, n_qubits*2+1)))
@@ -82,7 +85,10 @@ def reset_enc_train_ry_q_net(n_qubits):
 
         # Sequence of trainable variational layers
         for k in range(q_depth):
-            vqc.RY_layer(q_weights[k], ancilla=True)
+            if k % 2:
+                vqc.RZ_layer(q_weights[k], ancilla=True)
+            else:
+                vqc.RY_layer(q_weights[k], ancilla=True)
             vqc.entangling_layer(n_qubits, ancilla=True)
 
         # perform the SWAP test
@@ -95,14 +101,14 @@ def reset_enc_train_ry_q_net(n_qubits):
         return qml.expval(qml.PauliZ(0))
 
 
-def reset_enc_ry_q_net(n_qubits):
+def reset_enc_eff_anz_q_net(n_qubits):
 
     dev = qml.device("default.qubit", wires=n_qubits)
 
-    global enc_ry_q_net
+    global enc_eff_anz_q_net
 
     @qml.qnode(dev, interface="torch")
-    def enc_ry_q_net(q_weights_flat, init_rot=None, q_depth=None, n_qubits=None, op=None):
+    def enc_eff_anz_q_net(q_weights_flat, init_rot=None, q_depth=None, n_qubits=None, op=None):
         """ Goes from latent space to quantum state. """
         # Reshape weights
         q_weights = q_weights_flat.reshape(q_depth, n_qubits)
@@ -111,7 +117,10 @@ def reset_enc_ry_q_net(n_qubits):
 
         # Sequence of trainable variational layers
         for k in range(q_depth):
-            vqc.RY_layer(q_weights[k])
+            if k % 2:
+                vqc.RZ_layer(q_weights[k])
+            else:
+                vqc.RY_layer(q_weights[k])
             vqc.entangling_layer(n_qubits)
 
         return qml.probs(wires=list(range(n_qubits)))
@@ -124,7 +133,7 @@ def kronecker(A, B):
 class HQA(nn.Module):
 
     name = 'HQA'
-    def __init__(self, n_qubits, latent_size, num_params_enc, num_params_dec, gate_type='ry',
+    def __init__(self, n_qubits, latent_size, num_params_enc, num_params_dec, gate_type='eff_anz',
                  interwoven=False, adv_decoder=False):
 
         super().__init__()
@@ -145,7 +154,7 @@ class HQA(nn.Module):
         else:
             assert latent_size >= n_qubits
 
-        if gate_type == 'ry':
+        if gate_type == 'eff_anz':
             assert num_params_dec % self.latent_size == 0
 
         self.params_enc = nn.Parameter(0.1 * torch.randn(self.num_params_enc))
@@ -189,11 +198,12 @@ class HQA(nn.Module):
         else:
             amplitude_wires = list(range(0, self.n_qubits))
 
-        if self.gate_type == 'ry':
+        if self.gate_type == 'eff_anz':
             q_depth = int(self.num_params_dec // self.latent_size)
-            q_out = dec_ry_q_net(self.params_dec, amplitudes=amplitudes, amplitude_wires=amplitude_wires,
+            q_out = dec_eff_anz_q_net(self.params_dec, amplitudes=amplitudes, amplitude_wires=amplitude_wires,
                                  q_depth=q_depth, reg_size=self.latent_size, n_qubits=self.latent_size)
-
+        else:
+            print("'{}' gate type has not yet been implemented.".format(self.gate_type)); exit(3)
         if self.adv_decoder:
             q_out = torch.sigmoid(self.c_decoder_layer1(q_out.float()))
             q_out = self.c_decoder_layer_out(q_out.float())
@@ -203,10 +213,11 @@ class HQA(nn.Module):
         out = torch.sigmoid(self.c_layer2(out))
         out = torch.tanh(self.c_out(out)) * np.pi / 2.0
 
-        if self.gate_type == 'ry':
+        if self.gate_type == 'eff_anz':
             q_depth = int(self.num_params_enc // self.n_qubits)
-            out = enc_train_ry_q_net(out, amplitudes=amplitudes, init_rot=None, q_depth=q_depth, n_qubits=self.n_qubits)
+            out = enc_train_eff_anz_q_net(out, amplitudes=amplitudes, init_rot=None, q_depth=q_depth, n_qubits=self.n_qubits)
 
+        # self.draw_circs()
         return out
 
     def test(self, x):
@@ -225,12 +236,12 @@ class HQA(nn.Module):
         q_depth = int(self.num_params_enc // self.n_qubits)
 
         obs_gen = vqc.proj_meas_gen(self.n_qubits)
-        if self.gate_type == 'ry':
+        if self.gate_type == 'eff_anz':
             op = next(obs_gen)
-            q_out = enc_ry_q_net(out, q_depth=q_depth, op=op, n_qubits=self.n_qubits)
+            q_out = enc_eff_anz_q_net(out, q_depth=q_depth, op=op, n_qubits=self.n_qubits)
             for op in obs_gen:
                 break
-                q_out_elem = enc_ry_q_net(out, q_depth=q_depth, op=op, n_qubits=self.n_qubits).unsqueeze(0)
+                q_out_elem = enc_eff_anz_q_net(out, q_depth=q_depth, op=op, n_qubits=self.n_qubits).unsqueeze(0)
                 q_out = torch.cat((q_out, q_out_elem))
 
         if plot:
@@ -249,9 +260,9 @@ class HQA(nn.Module):
             amplitude_wires = list(range(0, 2 * self.n_qubits, 2))
         else:
             amplitude_wires = list(range(0, self.n_qubits))
-        if self.gate_type == 'ry':
+        if self.gate_type == 'eff_anz':
             q_depth = int(self.num_params_dec // self.latent_size)
-            q_out = dec_ry_q_net(self.params_dec, amplitudes=amplitudes, amplitude_wires=amplitude_wires,
+            q_out = dec_eff_anz_q_net(self.params_dec, amplitudes=amplitudes, amplitude_wires=amplitude_wires,
                                  q_depth=q_depth, reg_size=self.latent_size, n_qubits=self.latent_size)
 
         if self.adv_decoder:
@@ -316,9 +327,9 @@ class HQA(nn.Module):
         dbfile.close()
 
     def reset_q_circs(self):
-        reset_dec_ry_q_net(self.latent_size)
-        reset_enc_train_ry_q_net(2 * self.n_qubits + 1)
-        reset_enc_ry_q_net(self.n_qubits)
+        reset_dec_eff_anz_q_net(self.latent_size)
+        reset_enc_train_eff_anz_q_net(2 * self.n_qubits + 1)
+        reset_enc_eff_anz_q_net(self.n_qubits)
 
     def transition_states(self, states, iter_per_state, return_transition=False):
         if not return_transition:
@@ -412,6 +423,11 @@ class HQA(nn.Module):
             latent_points = pd.DataFrame(d)
 
         self.df_latent_vectors = latent_points
+
+    def draw_circs(self):
+        print(dec_eff_anz_q_net.draw())
+        print(enc_train_eff_anz_q_net.draw())
+        print(enc_eff_anz_q_net.draw())
 
 
 def train_hqa(model, distributions, num_iterations, loss_evol=None, batch_size=1,
@@ -592,7 +608,7 @@ def main_script(latent_size=12, d_type='gaussian', n_qubits=5, set_distribution=
     if set_distribution is not None:
         distributions = set_distribution
 
-    model = HQA(n_qubits, latent_size, num_params_enc, num_params_dec, gate_type='ry', interwoven=interwoven,
+    model = HQA(n_qubits, latent_size, num_params_enc, num_params_dec, gate_type='eff_anz', interwoven=interwoven,
                  adv_decoder=True)
     model.distr_type = d_type
     model, loss_evol = train_hqa(model, distributions, num_iterations, batch_size=batch_size, p_fuzz=p_fuzz,

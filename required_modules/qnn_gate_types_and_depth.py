@@ -113,6 +113,16 @@ def RY_layer(w, ancilla=False):
         qml.RY(element, wires=idx+anc)
 
 
+def RZ_layer(w, ancilla=False):
+    """Layer of parametrized qubit rotations around the Z axis.
+    """
+    anc = 0
+    if ancilla:
+        anc = 1
+    for idx, element in enumerate(w):
+        qml.RZ(element, wires=idx+anc)
+
+
 def U3_layer(w):
 
     assert (len(w) / 3) == n_qubits
