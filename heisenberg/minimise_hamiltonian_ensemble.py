@@ -185,7 +185,7 @@ if __name__ == '__main__':
         start = path_end_points[0]
         weights_list = [start + (vec*i) for i in range(num_Hamiltonians)]
     else:        
-        weights = [np.random.rand(len(couplings)) for _ in range(num_Hamiltonians)]
+        weights_list = [np.random.rand(len(couplings)) for _ in range(num_Hamiltonians)]
 
     np.random.seed(1011780235)
 
