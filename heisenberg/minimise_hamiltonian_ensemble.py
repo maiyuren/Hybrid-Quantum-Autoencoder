@@ -204,8 +204,8 @@ if __name__ == '__main__':
         Hamiltonians.append(H_expr)
         Jlists.append(list(weights))
         
-    # for i,Jlist in enumerate(Jlists):
-    #     print(f"""Coupling set {i+1:0>2}: {' '.join([f"{J:.3f}" for J in Jlist])}""")
+    for i,Jlist in enumerate(Jlists):
+        print(f"""Coupling set {i+1:0>2}: {' '.join([f"{J:.3f}" for J in Jlist])}""")
 
     with Pool(num_cores) as pool:
         results = pool.map(process_set, range(num_Hamiltonians))
