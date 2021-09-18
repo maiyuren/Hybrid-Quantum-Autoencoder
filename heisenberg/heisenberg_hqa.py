@@ -60,6 +60,7 @@ def datafile_to_dataframe(filename):
 
 def run_heisenberg_hqa_from_datafile(filename):
     data = datafile_to_dataframe(filename)
+    # data = data[data.depth==4]
     distributions = np.array(data.statevector.to_list())
 
     n_qubits = int(np.log2(len(distributions[0])))

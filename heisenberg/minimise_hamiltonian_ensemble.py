@@ -13,7 +13,7 @@ from scipy.optimize import minimize as minimise
 from multiprocessing import Pool
 import pickle
 import sys
-
+from HQA import pickle_file
 
 # -----------------------Useful Functions----------------------------------------
 
@@ -144,7 +144,7 @@ if __name__ == '__main__':
         D_list = list(range(1, Dmax+1))
 
     try:
-        path_flag = True if sys.argv[4] == "True" else False
+        path_flag = True if sys.argv[4] == "True" else None
         print("Finding points along path={}.".format(path_flag))
     except:
         path_flag = False
@@ -187,8 +187,8 @@ if __name__ == '__main__':
         Hamiltonians.append(H_expr)
         Jlists.append(list(weights))
         
-    for i,Jlist in enumerate(Jlists):
-        print(f"""Coupling set {i+1:0>2}: {' '.join([f"{J:.3f}" for J in Jlist])}""")
+    # for i,Jlist in enumerate(Jlists):
+    #     print(f"""Coupling set {i+1:0>2}: {' '.join([f"{J:.3f}" for J in Jlist])}""")
 
     with Pool(num_cores) as pool:
         results = pool.map(process_set, range(num_Hamiltonians))
@@ -198,5 +198,4 @@ if __name__ == '__main__':
         data[i] = results[i]
         data[i]['Jlist'] = Jlists[i]
 
-    with open('state_files/data{}_n_qubits-{}.pkl'.format("_path" if path_flag is True else "", n_qubits), 'wb') as f:
-        pickle.dump(data, f)
+    pickle_file('state_files/data{}_n_qubits-{}.pickle'.format("_path" if path_flag is True else "", n_qubits), data)

@@ -33,6 +33,12 @@ def standardize_data(X):
     return standardizedArray
 
 
+def fidelity(s1, s2):
+    """ This function returns the fidelity, given two complex state vectors. """
+    u = np.vdot(s1, s2)
+    return np.vdot(u, u).real
+
+
 def reset_dec_eff_anz_q_net(n_qubits):
 
     dev = qml.device("default.qubit", wires=n_qubits)
@@ -342,7 +348,10 @@ class HQA(nn.Module):
             for i in range(iter_per_state + 1):
                 out = self.encoder(state1 + i*tran_vec)
                 if return_transition:
-                    out_list.append(out.detach().numpy())
+                    try:
+                        out_list.append(out.detach().numpy())
+                    except AttributeError:
+                        out_list.append(out)
                 else:
                     plt.cla()
                     plt.plot(np.arange(-0.5*(2**self.n_qubits), 0.5*(2**self.n_qubits)), out.detach().numpy())
@@ -582,6 +591,24 @@ def regular_script():
 
     p = vqc.Pool(12)
     p.map(regular_process, r_list)
+
+
+def _free_filename(filename):
+    indx = 1
+    orig = filename
+    while True:
+        filename = orig.split('.pickle')[0] + '_ver{}.pickle'.format(indx)
+        if not os.path.isfile(filename):
+            break
+        indx += 1
+    return filename
+
+
+def pickle_file(filename, ob):
+
+    filename = _free_filename(filename)
+    with open(filename, "wb") as f:
+        pickle.dump(ob, f)
 
 
 def main_script(latent_size=12, d_type='gaussian', n_qubits=5, set_distribution=None, regular_term=None):
