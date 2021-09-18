@@ -13,6 +13,7 @@ from scipy.optimize import minimize as minimise
 from multiprocessing import Pool
 import pickle
 import sys
+sys.path.insert(0, "../")
 from HQA import pickle_file
 
 # -----------------------Useful Functions----------------------------------------
