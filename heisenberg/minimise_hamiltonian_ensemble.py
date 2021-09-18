@@ -13,8 +13,6 @@ from scipy.optimize import minimize as minimise
 from multiprocessing import Pool
 import pickle
 import sys
-sys.path.insert(0, "../")
-from HQA import pickle_file
 
 # -----------------------Useful Functions----------------------------------------
 
@@ -132,6 +130,24 @@ def process_set(s):
                  'statevector':statevec}
         
     return out
+
+
+def _free_filename(filename):
+    indx = 1
+    orig = filename
+    while True:
+        filename = orig.split('.pickle')[0] + '_ver{}.pickle'.format(indx)
+        if not os.path.isfile(filename):
+            break
+        indx += 1
+    return filename
+
+
+def pickle_file(filename, ob):
+
+    filename = _free_filename(filename)
+    with open(filename, "wb") as f:
+        pickle.dump(ob, f)
 
 
 if __name__ == '__main__':
